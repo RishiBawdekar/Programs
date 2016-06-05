@@ -1,0 +1,167 @@
+function CreateNewDraft()
+{
+ // This is the main function.
+ var today = new Date(); // get today's date.
+ labelArray = ["", "Mon", "Tue", "Wed", "Thu", "Fri", ""]; // five day week - label for each day - Monday to Friday
+ if ((today.getDay() == 0) || (today.getDay() == 6))
+ {
+   // If today is Saturday or Sunday, no drafts.
+   //return // If trigger is set, uncomment this line.
+   var labelname = "Mon"; // depending on the day, you can change the label name to any name in labelarray. However, comment this line 
+                          // otherwise, whenever you run the program, it will check the emails for Monday. This line is meant 
+                          // only for debugging. Use line 9 for automatic run.
+ } else 
+ {
+   // for other days, get the corresponding labelname for search.
+   var labelname = labelArray[today.getDay()];
+ }
+  subfunction(labelname);
+}
+
+function subfunction(labelname) 
+{
+  var thread = GmailApp.getUserLabelByName(labelname).getThreads(); // get all threads
+  // Follow code below for each thread
+  for (i=0; i < thread.length; i++)
+  {
+    var labels = thread[i].getLabels(); // for each thread, get all labels
+    var glabelArray = [];
+    // get label names
+    for (v = 0; v < labels.length; v++)
+         {
+           glabelArray.push(labels[v].getName())
+         }
+    var sortglabelArray = glabelArray.sort(); // sort label names in alphabetical order
+    var resplabel = sortglabelArray[0]; // the response label starts with 1. hence it is always the first item in the sorted array
+    var messages = thread[i].getMessages(); // get all messages in that thread
+    var lastmsg = messages.length - 1; // get last message in the thread
+    var emailTo      = messages[lastmsg].getTo(); // get TO field of last message
+    emailTo          = WebSafe(emailTo); // get only email id from TO field
+    var emailFrom0   = messages[lastmsg].getFrom(); // get FROM field of last message
+    var emailFrom    = WebSafe(emailFrom0); // get only email id from FROM field
+    var emailCC      = messages[lastmsg].getCc(); // get CC field of last message
+    emailCC          = WebSafe(emailCC); // get only email id from CC field
+    if (emailCC == null)
+      {
+      var emailCcHdr  = emailTo
+      } else 
+      {
+        if (emailTo == "")
+       {
+          var emailCcHdr = "";
+        } else 
+        {
+        var emailCcHdr  = emailTo + "," + emailCC;
+        }
+     }
+    var subject     = messages[lastmsg].getSubject(); // get SUJECT field of last message
+    subject = subject.replace(/([\[\(] *)?(RE|FWD?) *([-:;)\]][ :;\])-]*|$)|\]+ *$/igm,""); // remove REs and FWDs etc from subject line
+    var emailmsg    = messages[lastmsg].getBody(); // get html content of last message
+    var emaildate   = messages[lastmsg].getDate(); // get DATE field of last message
+    var sheetID = getSheetID(resplabel); // use the response label to get the ID of the sheet where response template is stored
+    if (sheetID == -1)
+    {
+      continue;
+    }
+    CreateDraft(sheetID, emailCcHdr, emailFrom, subject, emailmsg, emaildate, emailFrom0); // this function drafts the message.
+  }
+}
+
+function WebSafe(fullstring)
+{
+  var splitString = fullstring.split(",");
+  var finalarray = [];
+  for (u=0; u < splitString.length; u++)
+  {
+    var start_pos = splitString[u].indexOf("<") + 1;
+    var end_pos   = splitString[u].indexOf(">",start_pos);
+    if (!(splitString[u].indexOf("<") === -1 && splitString[u].indexOf(">",start_pos) === -1)) // if < and > do exist in string
+    {
+      finalarray.push(splitString[u].substring(start_pos, end_pos));
+    } else
+    {
+      finalarray.push(splitString[u]);
+    }
+  }
+  var index = finalarray.indexOf("abc@xyz.com"); // use your email id. if the array contains your email id, it is removed.
+  if (index > -1) {finalarray.splice(index, 1);}
+  return finalarray
+}
+
+function getSheetID(resplabel)
+{
+   // this function gets the ID of the sheet where the response template is stored. this sheet acts like a database
+    var sheet = SpreadsheetApp.openById("type-your-sheet-id"); // this is the ID of the sheet where all response sheet IDs are stored
+    var column = 4; //column number where the response IDs are stored.
+    var lastrow = sheet.getSheetByName('Sheet1').getLastRow();
+    var columnValues = sheet.getSheetByName('Sheet1').getRange(3, column, lastrow).getValues(); // my values start from row 3.
+    var searchResult = columnValues.findIndex(resplabel); //Row Index - 2
+    if(searchResult != -1)
+    {
+        // (searchResult + 3) is the row index where response label is matched.
+        var sheetID = sheet.getSheetByName('Sheet1').getRange(searchResult + 3, 3).getValue(); // sheet IDs are in 3rd column.
+        return sheetID;
+    } else
+    {
+      return -1;
+    }
+}
+
+Array.prototype.findIndex = function(search)
+{
+  if(search == "") return false;
+  for (var i=0; i<this.length; i++)
+    if (this[i].toString().indexOf(search) > -1 ) return i;
+
+  return -1;
+} 
+
+function CreateDraft(responseid, emailCcHdr, emailFrom, subject, emailmsg, emaildate, emailFrom0) 
+{ 
+  var edate = Utilities.formatDate(emaildate, "IST", "EEE, MMM d, yyyy"); // get date component from emaildate
+  var etime = Utilities.formatDate(emaildate, "IST", "h:mm a"); // get time component from emaildate
+  if (emailFrom.length == 0)
+  {
+    // if emailFrom is empty, it probably means that you may have written the last message in the thread. Hence 'you'.
+    var emailheader = '<html><body>' + 
+                      'On' + '&nbsp;' +
+                       edate + '&nbsp;' + 
+                      'at' + '&nbsp;' + 
+                       etime +  ',' + '&nbsp;' + 'you' + '&nbsp;' + 'wrote:' + '</body></html>';
+  } else 
+  {
+    var emailheader = '<html><body>' + 
+                      'On' + '&nbsp;' +
+                       edate + '&nbsp;' + 
+                      'at' + '&nbsp;' + 
+                       etime +  ',' + '&nbsp;' + emailFrom0 + '&nbsp;' + 'wrote:' + '</body></html>';
+  }
+  var emailsig = '<html>' + 
+                 '<div>Thanks &amp; Best Regards,</div>' +
+                 '<div>Your name</div>' +
+                 '</html>'; // your email signature which is common for all emails.
+  var doc = DocumentApp.openById(responseid); // Response ID of Template
+  var htmlBody = doc.getBody().getText(); // get html text from the template.
+  var forScope  = GmailApp.getInboxUnreadCount(); // needed for auth scope
+  var myEmailAddress = "abc@xyz.com" // your email address
+  var message = 'From: Me <' + myEmailAddress + '>\r\n' +
+    'To: '+ emailFrom +'\r\n' +
+    'Cc: '+ emailCcHdr +'\r\n' +
+    'Subject: ' + subject + '\r\n' +
+    'Content-Type: text/html; charset=utf-8\r\n' +
+    'Content-Transfer-Encoding: quoted-printable\r\n\r\n' +
+    htmlBody + '<br>' + emailsig + '<br>' + emailheader + '<br>' + emailmsg; // message content.
+  var draftBody = Utilities.base64Encode(message, Utilities.Charset.UTF_8); // base64 encoding
+  // replace some characters from the encoded output otherwise mail message is not valid.
+  draftBody = draftBody.replace(/\//g,'_').replace(/\+/g,'-');
+  var params = {method:"post",
+                contentType: "application/json",               
+                headers: {"Authorization": "Bearer " + ScriptApp.getOAuthToken()},
+                muteHttpExceptions:true,
+                payload:JSON.stringify(
+                  { "message": 
+                   { "raw": draftBody } 
+                  }  )
+               };                                               
+  var resp = UrlFetchApp.fetch("https://www.googleapis.com/gmail/v1/users/me/drafts", params); // creates draft.
+}
