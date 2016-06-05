@@ -91,7 +91,7 @@ function WebSafe(fullstring)
 function getSheetID(resplabel)
 {
    // this function gets the ID of the sheet where the response template is stored. this sheet acts like a database
-    var sheet = SpreadsheetApp.openById("type-your-sheet-id"); // this is the ID of the sheet where all response sheet IDs are stored
+    var sheet = SpreadsheetApp.openById("type-your-google-sheet-id"); // this is the ID of the sheet where all response sheet IDs are stored
     var column = 4; //column number where the response IDs are stored.
     var lastrow = sheet.getSheetByName('Sheet1').getLastRow();
     var columnValues = sheet.getSheetByName('Sheet1').getRange(3, column, lastrow).getValues(); // my values start from row 3.
