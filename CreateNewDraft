@@ -198,7 +198,6 @@ function RemoveLabel(labelname, thread)
   var salllabels = [];
   for (j = 0; j < alllabels.length; j++)
       {
-         //Logger.log(alllabels[j].getName());
          salllabels.push(alllabels[j].getName());
       }
   salllabels = salllabels.sort();
