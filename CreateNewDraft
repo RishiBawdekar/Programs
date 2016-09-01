@@ -2,7 +2,7 @@ function CreateNewDraft()
 {
  // This is the main function.
  var today = new Date(); // get today's date.
- labelArray = ["", "Mon", "Tue", "Wed", "Thu", "Fri", ""]; // five day week - label for each day - Monday to Friday
+ var labelArray = ["", "Mon", "Tue", "Wed", "Thu", "Fri", ""]; // five day week - label for each day - Monday to Friday
  if ((today.getDay() == 0) || (today.getDay() == 6))
  {
    // If today is Saturday or Sunday, no drafts.
@@ -20,11 +20,12 @@ function CreateNewDraft()
 
 function subfunction(labelname) 
 {
-  var thread = GmailApp.getUserLabelByName(labelname).getThreads(); // get all threads
+  var threads = GmailApp.getUserLabelByName(labelname).getThreads(); // get all threads
   // Follow code below for each thread
-  for (i=0; i < thread.length; i++)
+  for (i=0; i < threads.length; i++)
   {
-    var labels = thread[i].getLabels(); // for each thread, get all labels
+    var thread = threads[i];
+    var labels = thread.getLabels(); // for each thread, get all labels
     var glabelArray = [];
     // get label names
     for (v = 0; v < labels.length; v++)
@@ -58,12 +59,24 @@ function subfunction(labelname)
     subject = subject.replace(/([\[\(] *)?(RE|FWD?) *([-:;)\]][ :;\])-]*|$)|\]+ *$/igm,""); // remove REs and FWDs etc from subject line
     var emailmsg    = messages[lastmsg].getBody(); // get html content of last message
     var emaildate   = messages[lastmsg].getDate(); // get DATE field of last message
-    var sheetID = getSheetID(resplabel); // use the response label to get the ID of the sheet where response template is stored
-    if (sheetID == -1)
+    var responseid = getSheetID(resplabel); // use the response label to get the ID of the sheet where response template is stored
+    if (responseid == -1)
     {
       continue;
     }
-    CreateDraft(sheetID, emailCcHdr, emailFrom, subject, emailmsg, emaildate, emailFrom0, labelname); // this function drafts the message.
+    var data = 
+	{
+	  "responseid" : responseid,
+	  "emailCcHdr" : emailCcHdr,
+	  "emailFrom"  : emailFrom,
+	  "subject"    : subject,
+	  "emailmsg"   : emailmsg,
+	  "emaildate"  : emaildate,
+	  "emailFrom0" : emailFrom0,
+	  "labelname"  : labelname,
+	  "thread"     : thread,
+	};
+    CreateDraft(data); // this function drafts the message.
   }
 }
 
@@ -113,11 +126,11 @@ Array.prototype.findIndex = function(search)
   return -1;
 } 
 
-function CreateDraft(responseid, emailCcHdr, emailFrom, subject, emailmsg, emaildate, emailFrom0, labelname) 
+function CreateDraft(data) 
 { 
-  var edate = Utilities.formatDate(emaildate, "IST", "EEE, MMM d, yyyy"); // get date component from emaildate
-  var etime = Utilities.formatDate(emaildate, "IST", "h:mm a"); // get time component from emaildate
-  if (emailFrom.length == 0)
+  var edate = Utilities.formatDate(data["emaildate"], "IST", "EEE, MMM d, yyyy"); // get date component from emaildate
+  var etime = Utilities.formatDate(data["emaildate"], "IST", "h:mm a"); // get time component from emaildate
+  if (data["emailFrom"].length == 0)
   {
     // if emailFrom is empty, it probably means that you may have written the last message in the thread. Hence 'you'.
     var emailheader = '<html><body>' + 
@@ -131,33 +144,33 @@ function CreateDraft(responseid, emailCcHdr, emailFrom, subject, emailmsg, email
                       'On' + '&nbsp;' +
                        edate + '&nbsp;' + 
                       'at' + '&nbsp;' + 
-                       etime +  ',' + '&nbsp;' + emailFrom0 + '&nbsp;' + 'wrote:' + '</body></html>';
+                       etime +  ',' + '&nbsp;' + data["emailFrom0"] + '&nbsp;' + 'wrote:' + '</body></html>';
   }
   var emailsig = '<html>' + 
                  '<div>Thanks &amp; Best Regards,</div>' +
                  '<div>Your name</div>' +
                  '</html>'; // your email signature which is common for all emails. Type in your name.
-  var doc = DocumentApp.openById(responseid); // Response ID of Template
+  var doc = DocumentApp.openById(data["responseid"]); // Response ID of Template
   var htmlBody = doc.getBody().getText(); // get html text from the template.
   var forScope  = GmailApp.getInboxUnreadCount(); // needed for auth scope
   var myEmailAddress = "abc@xyz.com" // your email address
-  if (emailFrom == "")
+  if (data["emailFrom"] == "")
   {
     var message = 'From: Me <' + myEmailAddress + '>\r\n' +
-                   'To: '+ emailCcHdr +'\r\n' +
-                   'Subject: ' + subject + '\r\n' +
+                   'To: '+ data["emailCcHdr"] +'\r\n' +
+                   'Subject: ' + data["subject"] + '\r\n' +
                    'Content-Type: text/html; charset=utf-8\r\n' +
                    'Content-Transfer-Encoding: quoted-printable\r\n\r\n' +
-                    htmlBody + '<br>' + emailsig + '<br>' + emailheader + '<br>' + emailmsg;
+                    htmlBody + '<br>' + emailsig + '<br>' + emailheader + '<br>' + data["emailmsg"];
   } else
   {
      var message = 'From: Me <' + myEmailAddress + '>\r\n' +
-                   'To: '+ emailFrom +'\r\n' +
-                   'Cc: '+ emailCcHdr +'\r\n' +
-                   'Subject: ' + subject + '\r\n' +
+                   'To: '+ data["emailFrom"]  +'\r\n' +
+                   'Cc: '+ data["emailCcHdr"] +'\r\n' +
+                   'Subject: ' + data["subject"] + '\r\n' +
                    'Content-Type: text/html; charset=utf-8\r\n' +
                    'Content-Transfer-Encoding: quoted-printable\r\n\r\n' +
-                    htmlBody + '<br>' + emailsig + '<br>' + emailheader + '<br>' + emailmsg; // message content.
+                    htmlBody + '<br>' + emailsig + '<br>' + emailheader + '<br>' + data["emailmsg"]; // message content.
   }
   var draftBody = Utilities.base64Encode(message, Utilities.Charset.UTF_8); // base64 encoding
   // replace some characters from the encoded output otherwise mail message is not valid.
@@ -175,27 +188,23 @@ function CreateDraft(responseid, emailCcHdr, emailFrom, subject, emailmsg, email
   var respobj = JSON.parse(resp.getContentText()); //  converts string to JSON object
   if (respobj.message.id) // if draft is created, it will have an id. if id is found, remove labels.
   {
-    RemoveLabel(labelname);
+    RemoveLabel(data["labelname"], data["thread"]);
   }
 }
 
-function RemoveLabel(labelname)
+function RemoveLabel(labelname, thread)
 {
-  var thread = GmailApp.getUserLabelByName(labelname).getThreads(); // get all threads of a specific label
-  for (var i = 0; i < thread.length; i++) // for each thread, run this code.
+  var alllabels = thread.getLabels();
+  var salllabels = [];
+  for (j = 0; j < alllabels.length; j++)
+      {
+         //Logger.log(alllabels[j].getName());
+         salllabels.push(alllabels[j].getName());
+      }
+  salllabels = salllabels.sort();
+  if (!(salllabels[0].indexOf("1R/") === -1)) // first label contains "1R/" -> response label
   {
-    var alllabels = thread[i].getLabels(); // get all labels of a thread
-    var salllabels = [];
-    for (j = 0; j < alllabels.length; j++)
-         {
-           salllabels.push(alllabels[j].getName()); // get names of all labels of a thread
-         }
-    salllabels = salllabels.sort(); // sort the array. I label my response variables as 1R/1, 1R/34 etc. Hence, those will always
-                                    // be the first element in the sorted array. One response variable per thread / email.
-    if (!(salllabels[0].indexOf("1R/") === -1)) // first element contains "1R/" -> response label
-    {
-      GmailApp.getUserLabelByName(salllabels[0]).removeFromThread(thread[i]); // remove response label from thread
-      GmailApp.getUserLabelByName(labelname).removeFromThread(thread[i]); // remove day label (labelname) from thread
-    }
+    GmailApp.getUserLabelByName(salllabels[0]).removeFromThread(thread);
+    GmailApp.getUserLabelByName(labelname).removeFromThread(thread);
   }
 }
