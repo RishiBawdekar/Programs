@@ -34,7 +34,7 @@ function subfunction(labelname)
          }
     glabelArray = glabelArray.sort(); // sort label names in alphabetical order
     var resplabel = glabelArray[0]; // the response label starts with 1. hence it is always the first item in the sorted array
-    var messages = thread[i].getMessages(); // get all messages in that thread
+    var messages = thread.getMessages(); // get all messages in that thread
     var lastmsg = messages.length - 1; // get last message in the thread
     var emailTo      = messages[lastmsg].getTo(); // get TO field of last message
     emailTo          = WebSafe(emailTo); // get only email id from TO field
